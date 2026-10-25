@@ -91,6 +91,16 @@ def legacy_launch_params(row):
         route.setdefault('provider', 'custom')
     if row['source'] == 'acp' and 'cwd' not in params and Path(str(saved.get('cwd') or '')).is_absolute():
         params['cwd'] = saved['cwd']
+    # Native providers persist a process pseudo-endpoint for accounting. It is
+    # not an HTTP launch override: let that registered provider resolve its own
+    # endpoint. Drop only an exact registered match; unknown URLs remain subject
+    # to the normal fail-closed launch validation.
+    if str(route.get('base_url', '')).startswith('process://') and route.get('provider'):
+        from providers import get_provider_profile
+        profile = get_provider_profile(route['provider'])
+        if (profile is not None and profile.auth_type == 'external_process'
+                and profile.base_url == route['base_url']):
+            route.pop('base_url')
     params.update({key: route[key] for key in ('provider', 'base_url') if key in route})
     reasoning = saved.get('reasoning_config')
     if isinstance(reasoning, dict):
